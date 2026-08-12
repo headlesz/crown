@@ -1,0 +1,73 @@
+plugins {
+    id 'net.neoforged.moddev' version '2.0.143'
+}
+
+version = mod_version
+group = mod_group_id
+
+base {
+    archivesName = mod_id
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
+}
+
+repositories {
+    mavenCentral()
+}
+
+neoForge {
+    version = neo_version
+
+    runs {
+        server {
+            server()
+            programArguments.addAll '--nogui'
+        }
+    }
+
+    mods {
+        crown {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+dependencies {
+    // Soft dependency (spec 3.3). Present at compile time only; every call site is guarded
+    // behind ModList.isLoaded("luckperms") so the classes are never touched when LP is absent.
+    compileOnly 'net.luckperms:api:5.4'
+
+    testImplementation platform('org.junit:junit-bom:5.10.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 21
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+    }
+}
+
+tasks.named('processResources', ProcessResources).configure {
+    def replacements = [
+            mod_id         : mod_id,
+            mod_name       : mod_name,
+            mod_version    : mod_version,
+            mod_license    : mod_license,
+            mod_authors    : mod_authors,
+            mod_description: mod_description,
+            neo_version    : neo_version,
+    ]
+    inputs.properties replacements
+    filesMatching('META-INF/neoforge.mods.toml') {
+        expand replacements
+    }
+}
