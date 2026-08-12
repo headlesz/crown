@@ -548,6 +548,11 @@ public final class CrownCommands {
         line(source, "pack", state.hasPack() ? state.packUrl() : "(default)");
         line(source, "ledger entries", String.valueOf(state.ledger().size()));
         line(source, "luckperms", CrownPermissions.luckPermsPresent() ? "present" : "absent (fallback)");
+        if (TermManager.awaitingCampaignStart(state)) {
+            source.sendSuccess(() -> Component.literal(
+                            "No campaign started. Run /crown admin election open to call the first vote.")
+                    .withStyle(ChatFormatting.YELLOW), false);
+        }
         return 1;
     }
 
@@ -561,6 +566,11 @@ public final class CrownCommands {
         if (term == null) {
             source.sendSuccess(() -> Component.literal("The throne stands empty.")
                     .withStyle(ChatFormatting.GRAY), false);
+            if (TermManager.awaitingCampaignStart(state)) {
+                source.sendSuccess(() -> Component.literal(
+                                "No campaign has begun yet — an operator calls the first vote.")
+                        .withStyle(ChatFormatting.DARK_GRAY), false);
+            }
         } else {
             source.sendSuccess(() -> Component.literal("\"" + term.name() + "\" — "
                             + term.monarchName() + " reigns, "

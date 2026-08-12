@@ -254,14 +254,16 @@ public final class TermManager {
                 + CrownTime.hours(CrownConfig.ELECTION_WINDOW_HOURS.get()));
     }
 
-    /** Starts the very first term of a campaign by opening the opening election. */
-    public static void ensureCampaignStarted(MinecraftServer server, CrownState state) {
-        if (state.currentTerm() == null && state.election() == null
-                && state.phase() == TermPhase.INTERREGNUM && !state.activeThisTerm().isEmpty()) {
-            Crown.LOGGER.info("No monarch and no election: opening the campaign's first vote");
-            openElection(server, state, CrownTime.now()
-                    + CrownTime.hours(CrownConfig.ELECTION_WINDOW_HOURS.get()));
-        }
+    /**
+     * True when no campaign has begun yet: no monarch, no vote, and no term ever served. The
+     * opening election is called deliberately with {@code /crown admin election open} rather than
+     * firing on the first login, so the group starts the cycle when it means to.
+     */
+    public static boolean awaitingCampaignStart(CrownState state) {
+        return state.currentTerm() == null
+                && state.election() == null
+                && state.pastTerms().isEmpty()
+                && state.phase() == TermPhase.INTERREGNUM;
     }
 
     /** Shared by {@code /crown resign} and {@code /crown admin remove-monarch}. */

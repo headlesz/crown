@@ -88,7 +88,7 @@ public final class CrownEvents {
                     .withStyle(ChatFormatting.GRAY)
                     .append(Component.literal(state.phase() == TermPhase.ELECTION
                                     ? "Cast your ballot with /vote."
-                                    : "An election will open shortly.")
+                                    : "A vote opens when an operator calls one.")
                             .withStyle(ChatFormatting.WHITE)));
             return;
         }

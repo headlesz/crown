@@ -70,6 +70,11 @@ public final class CrownScheduler {
             }
         }
         RaidManager.tick(server, state);
+
+        if (TermManager.awaitingCampaignStart(state)) {
+            Crown.LOGGER.info("Crown is idle: no campaign has started yet. "
+                    + "Run '/crown admin election open' to call the first vote.");
+        }
     }
 
     /** @return true if this pass changed anything, so the caller knows to look again */
@@ -95,9 +100,10 @@ public final class CrownScheduler {
             }
         }
 
-        if (state.phase() == TermPhase.INTERREGNUM) {
-            TermManager.ensureCampaignStarted(server, state);
-        }
+        // Note: an empty throne never opens a vote by itself. A campaign is started deliberately
+        // with /crown admin election open. The interregnum that follows a resignation, a removal
+        // or a failed election is different — TermManager.enterInterregnum opens that vote itself,
+        // because there the group has already committed to the cycle.
 
         if (current != null) {
             checkScheduledEvents(server, state, current, now);
