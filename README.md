@@ -95,6 +95,9 @@ drops; post-raid abundance is accepted, because the season is ending anyway.
 ### Prestige ledger
 
 An append-only log of reigns served, titles granted, and commissions issued and completed.
+A commission is an open bounty — the monarch declares the build, anyone may deliver it, and the
+delivery is credited either to one named player (it joins their `/laurels`) or to `everyone`
+(it counts in the term's `/halloffame` digest instead).
 
 Crown **never computes, displays or compares a score**. There is no leaderboard and no ranking,
 because a ranking would reintroduce exactly the algorithmic-contribution failure mode the design
@@ -157,8 +160,7 @@ All of these expire at term end, and all freeze while the succession vote is ope
 | `/crown event cancel <name>` | Call it off |
 | `/crown title grant <player> <title>` | Grant a cosmetic title (max 3 per term) |
 | `/crown commission <text>` | Publicly commission a build — an open bounty anyone may complete (max 3 standing) |
-| `/crown commission complete <player> [number]` | Mark it delivered by that player, with fanfare |
-| `/crown commission complete everyone [number]` | Mark it delivered by the whole group |
+| `/crown commission complete <player>\|everyone [number]` | Mark it delivered — credited to that player, or to the whole group. `[number]` is the commission's position from `/crown`, optional while only one stands |
 | `/crown pack set <url> <sha1>` | Set the term's resource pack |
 | `/crown pack clear` | Revert to the default |
 | `/crown endraid request <start-time> <hours>` | Propose the season finale |
