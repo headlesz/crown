@@ -167,8 +167,9 @@ public final class CrownCommands {
                     AnnounceType.DECREE,
                     Component.literal("This term shall be known as \"" + name + "\".")
                             .withStyle(ChatFormatting.GOLD),
-                    "Term named",
-                    "Term " + term.index() + " is now \"" + name + "\"."));
+                    "Let it be proclaimed",
+                    "Henceforth and for all the age, Term " + term.index()
+                            + " shall be known as \"" + name + "\"."));
             return 1;
         });
     }
@@ -181,8 +182,9 @@ public final class CrownCommands {
                     AnnounceType.DECREE,
                     Component.literal("The genre of this term: " + genre)
                             .withStyle(ChatFormatting.LIGHT_PURPLE),
-                    "Genre set",
-                    genre));
+                    "The temper of the term",
+                    "\"" + genre + "\" — so declares " + term.monarchName()
+                            + ", and so it shall be."));
             return 1;
         });
     }
@@ -201,8 +203,9 @@ public final class CrownCommands {
                     AnnounceType.DECREE,
                     Component.literal("DECREE: ").withStyle(ChatFormatting.DARK_PURPLE, ChatFormatting.BOLD)
                             .append(Component.literal(text).withStyle(ChatFormatting.WHITE)),
-                    "Decree",
-                    text + "\n\n— " + term.monarchName() + ", \"" + term.name() + "\""));
+                    "A royal decree",
+                    "Hear ye, hear ye:\n" + text
+                            + "\n\n— " + term.monarchName() + ", sovereign of \"" + term.name() + "\""));
             return 1;
         });
     }
@@ -233,8 +236,10 @@ public final class CrownCommands {
                     AnnounceType.EVENT_SCHEDULED,
                     Component.literal("Event scheduled: \"" + name + "\" — "
                             + CrownTime.format(startsAt)).withStyle(ChatFormatting.GREEN),
-                    "Event scheduled: " + name,
-                    CrownTime.format(startsAt) + (description.isEmpty() ? "" : "\n" + description)));
+                    "The monarch summons the realm: \"" + name + "\"",
+                    "All are called to attend " + CrownTime.discord(startsAt) + " — "
+                            + CrownTime.discordRelative(startsAt) + "."
+                            + (description.isEmpty() ? "" : "\n" + description)));
             return 1;
         });
     }
@@ -251,8 +256,8 @@ public final class CrownCommands {
             Announcer.emit(ctx.getSource().getServer(), AnnounceEvent.of(
                     AnnounceType.EVENT_CANCELLED,
                     Component.literal("Event cancelled: \"" + name + "\".").withStyle(ChatFormatting.GRAY),
-                    "Event cancelled: " + name,
-                    "Called off by " + term.monarchName() + "."));
+                    "The gathering is called off",
+                    "\"" + name + "\" shall not come to pass — so says " + term.monarchName() + "."));
             return 1;
         });
     }
@@ -301,13 +306,15 @@ public final class CrownCommands {
                     target.getId(), target.getName(), title,
                     term.monarch(), term.monarchName(), term.index(), CrownTime.now()));
             CrownPermissions.onTitleGranted(target.getId(), title);
+            Players.refreshDisplay(ctx.getSource().getServer(), target.getId());
 
             Announcer.emit(ctx.getSource().getServer(), AnnounceEvent.of(
                     AnnounceType.TITLE_GRANTED,
                     Component.literal(target.getName() + " is named ").withStyle(ChatFormatting.YELLOW)
                             .append(Component.literal("\"" + title + "\"").withStyle(ChatFormatting.GOLD)),
-                    "Title granted",
-                    target.getName() + " — \"" + title + "\"\nGranted by " + term.monarchName()));
+                    "A title is bestowed",
+                    "Let all the realm know " + target.getName() + " henceforth as \"" + title
+                            + "\" — by the word of " + term.monarchName() + "."));
             return 1;
         });
     }
@@ -328,8 +335,9 @@ public final class CrownCommands {
                     Component.literal("COMMISSION: ").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD)
                             .append(Component.literal(target.getName() + " — " + text)
                                     .withStyle(ChatFormatting.WHITE)),
-                    "Commission issued",
-                    target.getName() + "\n" + text));
+                    "A royal commission",
+                    target.getName() + " is charged by the crown of " + term.monarchName()
+                            + ": " + text + "\nLet the work begin."));
             return 1;
         });
     }
@@ -351,8 +359,9 @@ public final class CrownCommands {
                     AnnounceType.COMMISSION_COMPLETED,
                     Component.literal("Commission complete — " + target.getName() + " built: " + text)
                             .withStyle(ChatFormatting.GOLD),
-                    "Commission completed",
-                    target.getName() + " delivered: " + text));
+                    "A commission is delivered",
+                    target.getName() + " has delivered what the crown asked: " + text
+                            + "\nLet it stand for all to see."));
             return 1;
         });
     }

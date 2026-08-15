@@ -36,8 +36,9 @@ public final class CrownScheduler {
     public static void onServerTick(MinecraftServer server) {
         CrownState state = CrownState.get(server);
 
-        // The join-push queue is tick-granular, so it runs every tick.
+        // The join-push and briefing queues are tick-granular, so they run every tick.
         PackManager.processQueue(server, state);
+        CrownEvents.processBriefingQueue(server, state);
 
         if (server.getTickCount() % 20 != 0) {
             return;
@@ -152,8 +153,9 @@ public final class CrownScheduler {
                                         + (event.description().isEmpty() ? "" : " " + event.description()))
                                 .withStyle(AnnounceType.EVENT_STARTING.chatColor()),
                         Component.literal(event.name()).withStyle(AnnounceType.EVENT_STARTING.chatColor()),
-                        "Event starting: " + event.name(),
-                        event.description()));
+                        "The hour is come: \"" + event.name() + "\"",
+                        "The gathering begins now. Attend, one and all!"
+                                + (event.description().isEmpty() ? "" : "\n" + event.description())));
             }
         }
     }

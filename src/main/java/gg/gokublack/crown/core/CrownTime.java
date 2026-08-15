@@ -39,6 +39,19 @@ public final class CrownTime {
         return DISPLAY.format(Instant.ofEpochMilli(epochMillis));
     }
 
+    /**
+     * Discord dynamic timestamp ({@code <t:…:F>}): renders in each reader's own timezone, so an
+     * announcement never has to name a zone. Discord-only — meaningless in game chat.
+     */
+    public static String discord(long epochMillis) {
+        return "<t:" + (epochMillis / 1000L) + ":F>";
+    }
+
+    /** Discord relative timestamp ({@code <t:…:R>}), e.g. "in 2 days". */
+    public static String discordRelative(long epochMillis) {
+        return "<t:" + (epochMillis / 1000L) + ":R>";
+    }
+
     /** Human-friendly remaining time, e.g. {@code 2d 4h}, {@code 37m}. */
     public static String remaining(long untilEpochMillis) {
         long ms = untilEpochMillis - now();

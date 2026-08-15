@@ -5,6 +5,7 @@ import gg.gokublack.crown.announce.AnnounceEvent;
 import gg.gokublack.crown.announce.AnnounceType;
 import gg.gokublack.crown.announce.Announcer;
 import gg.gokublack.crown.core.CrownConfig;
+import gg.gokublack.crown.core.CrownEvents;
 import gg.gokublack.crown.core.CrownExporter;
 import gg.gokublack.crown.core.CrownPermissions;
 import gg.gokublack.crown.core.CrownState;
@@ -57,10 +58,13 @@ public final class TermManager {
                         .withStyle(AnnounceType.ELECTION_OPENED.chatColor())
                         .append(Component.literal("Use /vote — closes in "
                                 + CrownTime.remaining(closesAt) + ".").withStyle(ChatFormatting.WHITE)),
-                "Election open — Term " + forTerm,
-                "Voting closes " + CrownTime.format(closesAt) + ".\nCandidates: "
-                        + (candidates.isEmpty() ? "(none yet)" : candidates)
-                        + "\nBallots are cast in-game with /vote."));
+                "Hear ye — the vote for Term " + forTerm + " is open",
+                "The realm must choose its next sovereign, on the one true criterion: "
+                        + "who did the most cool shit this term? Ballots are cast in-game "
+                        + "with /vote.\nStanding before the realm: "
+                        + (candidates.isEmpty() ? "(no one yet)" : candidates)
+                        + "\nThe polls close " + CrownTime.discord(closesAt)
+                        + " — " + CrownTime.discordRelative(closesAt) + "."));
         CrownExporter.export(server, state);
     }
 
@@ -78,8 +82,10 @@ public final class TermManager {
                 Component.literal("Voting extended: " + reason + " New close in "
                         + CrownTime.remaining(election.closesAt()) + ".")
                         .withStyle(AnnounceType.ELECTION_EXTENDED.chatColor()),
-                "Election extended",
-                reason + "\nNew close: " + CrownTime.format(election.closesAt())));
+                "By decree, the vote stays open",
+                "The realm's judgement is not yet rendered: " + reason
+                        + "\nThe polls now close " + CrownTime.discord(election.closesAt())
+                        + " — " + CrownTime.discordRelative(election.closesAt()) + "."));
         CrownExporter.export(server, state);
     }
 
@@ -110,10 +116,9 @@ public final class TermManager {
                     Component.literal("The vote is closed. " + winner.votes() + " of "
                             + winner.totalBallots() + " ballots carried the day.")
                             .withStyle(AnnounceType.ELECTION_CLOSED.chatColor()),
-                    "Election closed",
-                    "Winner takes the throne with " + winner.votes() + "/" + winner.totalBallots()
-                            + " ballots."
-                            + (winner.tieBreakNote().isEmpty() ? "" : "\n" + winner.tieBreakNote())));
+                    "The realm has spoken",
+                    "The ballots are counted: " + winner.votes() + " of " + winner.totalBallots()
+                            + " carried the day. Let the coronation commence."));
             if (!winner.tieBreakNote().isEmpty()) {
                 Crown.LOGGER.info("Election tie-break: {}", winner.tieBreakNote());
             }
@@ -137,8 +142,10 @@ public final class TermManager {
                     Component.literal("Dead heat. A runoff between " + names + " is open for "
                             + CrownTime.remaining(closesAt) + ".")
                             .withStyle(AnnounceType.ELECTION_EXTENDED.chatColor()),
-                    "Runoff",
-                    "Tied: " + names + "\nRunoff closes " + CrownTime.format(closesAt)));
+                    "A dead heat — a runoff is proclaimed",
+                    names + " stand level before the realm. A fresh ballot between exactly "
+                            + "these worthies closes " + CrownTime.discord(closesAt) + " — "
+                            + CrownTime.discordRelative(closesAt) + "."));
             CrownExporter.export(server, state);
             return;
         }
@@ -182,11 +189,16 @@ public final class TermManager {
                         Component.literal("\"" + outgoing.name() + "\" has ended. "
                                 + outgoing.monarchName() + " steps down.")
                                 .withStyle(AnnounceType.TERM_ENDED.chatColor()),
-                        "Term ended — " + outgoing.name(),
-                        outgoing.monarchName() + "'s reign is over."
+                        "\"" + outgoing.name() + "\" has passed into history",
+                        "The reign of " + outgoing.monarchName()
+                                + " is ended; the crown awaits its next head. Let the ledger "
+                                + "remember their works."
                                 + (outgoing.decrees().isEmpty() ? ""
-                                : "\nDecrees: " + String.join(" | ", outgoing.decrees()))));
+                                : "\nTheir decrees expire with the term, as all things must: "
+                                        + String.join(" | ", outgoing.decrees()))));
                 state.setCurrentTerm(null);
+                // Now that the term record is gone, the ex-monarch's name sheds its prefix.
+                Players.refreshDisplay(server, outgoing.monarch());
             }
 
             // 5. Per-term substate resets before the new monarch inherits anything.
@@ -213,15 +225,23 @@ public final class TermManager {
 
                 CrownPermissions.onMonarchInstalled(incoming, endsAt);
                 state.appendLedger(new LedgerEntry.ReignServed(incoming, name, newIndex, now));
+                Players.refreshDisplay(server, incoming);
+
+                // A winner who is online right now is briefed moments after the coronation
+                // announcement; one who is offline is queued by the login handler instead.
+                if (server.getPlayerList().getPlayer(incoming) != null) {
+                    CrownEvents.queueBriefing(server, incoming);
+                }
 
                 Announcer.emit(server, new AnnounceEvent(
                         AnnounceType.TERM_STARTED,
                         Component.literal("Long live " + name + " — monarch for Term " + newIndex + ".")
                                 .withStyle(AnnounceType.TERM_STARTED.chatColor()),
                         Component.literal(name).withStyle(AnnounceType.TERM_STARTED.chatColor()),
-                        "Term " + newIndex + " begins",
-                        name + " takes the throne until " + CrownTime.format(endsAt)
-                                + ".\nCause: " + cause.name().toLowerCase()));
+                        "Hail — Term " + newIndex + " begins",
+                        "Long live " + name + ", sovereign of the realm by its own free vote! "
+                                + "The throne is theirs until " + CrownTime.discord(endsAt)
+                                + ", and not a moment longer."));
             }
 
             // 6. Persist and publish.
@@ -249,7 +269,8 @@ public final class TermManager {
                 Component.literal("The throne stands empty: " + reason
                         + " A new vote opens now.").withStyle(AnnounceType.INTERREGNUM.chatColor()),
                 "Interregnum",
-                reason + "\nA fresh election is opening."));
+                "Woe — the throne stands empty: " + reason
+                        + "\nA new vote opens forthwith. The realm endures."));
         openElection(server, state, CrownTime.now()
                 + CrownTime.hours(CrownConfig.ELECTION_WINDOW_HOURS.get()));
     }
@@ -280,7 +301,7 @@ public final class TermManager {
                 Component.literal(current.monarchName() + " no longer holds the crown: " + reason)
                         .withStyle(AnnounceType.INTERREGNUM.chatColor()),
                 "The throne is vacated",
-                current.monarchName() + " — " + reason));
+                current.monarchName() + " no longer bears the crown: " + reason));
         enterInterregnum(server, state, cause, reason);
     }
 

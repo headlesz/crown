@@ -53,12 +53,11 @@ public final class RaidManager {
                         + " has called for the season's finale: the End would open "
                         + CrownTime.format(startsAt) + " for " + clamped + "h. Awaiting an operator.")
                         .withStyle(AnnounceType.RAID_REQUESTED.chatColor()),
-                "End raid proposed",
-                "Proposed by " + monarch.getGameProfile().getName()
-                        + "\nStart: " + CrownTime.format(startsAt)
-                        + "\nDuration: " + clamped + "h"
-                        + (clamped < durationHours ? " (clamped from " + durationHours + "h)" : "")
-                        + "\nAn operator must confirm with /crown admin endraid confirm."));
+                "The finale is called",
+                "The monarch " + monarch.getGameProfile().getName()
+                        + " petitions for the season's grand finale: the End would be flung open "
+                        + CrownTime.discord(startsAt) + " for " + clamped + " hours."
+                        + "\nThe petition awaits an operator's assent."));
         CrownExporter.export(server, state);
         return null;
     }
@@ -74,9 +73,11 @@ public final class RaidManager {
                 Component.literal("The finale is confirmed. The End opens "
                         + CrownTime.format(state.raid().startsAt()) + ".")
                         .withStyle(AnnounceType.RAID_CONFIRMED.chatColor()),
-                "End raid confirmed",
-                "Window: " + CrownTime.format(state.raid().startsAt())
-                        + " to " + CrownTime.format(state.raid().endsAt())));
+                "Let it be known — the finale is confirmed",
+                "It is sealed and settled: the End opens "
+                        + CrownTime.discord(state.raid().startsAt())
+                        + " and shuts " + CrownTime.discord(state.raid().endsAt())
+                        + ". Make ready, one and all."));
         CrownExporter.export(server, state);
         return null;
     }
@@ -91,7 +92,7 @@ public final class RaidManager {
                 AnnounceType.RAID_REQUESTED,
                 Component.literal("The finale proposal was declined: " + reason)
                         .withStyle(ChatFormatting.GRAY),
-                "End raid denied",
+                "The finale petition is refused",
                 reason));
         return null;
     }
@@ -112,7 +113,9 @@ public final class RaidManager {
                     Component.literal("THE END IS OPEN")
                             .withStyle(AnnounceType.RAID_OPENED.chatColor()),
                     "The End is open",
-                    "The gate closes " + CrownTime.format(raid.endsAt()) + "."));
+                    "The gate stands open until " + CrownTime.discord(raid.endsAt())
+                            + " — " + CrownTime.discordRelative(raid.endsAt())
+                            + ". Go forth and claim your glory."));
             CrownExporter.export(server, state);
         }
 
@@ -140,7 +143,8 @@ public final class RaidManager {
                 Component.literal("THE END IS SEALED")
                         .withStyle(AnnounceType.RAID_CLOSED.chatColor()),
                 "The End is sealed",
-                "The finale window has closed. Entry is blocked; exit is not."));
+                "The finale has run its course; the gate is barred anew. Any soul yet within "
+                        + "may walk home through the return portal, unhurried and unharried."));
         CrownExporter.export(server, state);
     }
 

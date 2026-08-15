@@ -49,6 +49,19 @@ public final class Players {
     }
 
     /**
+     * Recomputes a player's decorated display name in chat and the tab list. Called whenever
+     * the crown changes hands or a title is granted — display names are cached, so without this
+     * a coronation would not show until relog.
+     */
+    public static void refreshDisplay(MinecraftServer server, UUID id) {
+        ServerPlayer online = server.getPlayerList().getPlayer(id);
+        if (online != null) {
+            online.refreshDisplayName();
+            online.refreshTabListName();
+        }
+    }
+
+    /**
      * Everyone the server considers a member: the whitelist when one is enforced, otherwise
      * everyone seen this term plus everyone currently online.
      */

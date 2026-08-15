@@ -123,8 +123,9 @@ public final class PackManager {
                 Component.literal("A new server resource pack is up for this term. "
                         + "You can decline it — nothing breaks if you do.")
                         .withStyle(AnnounceType.PACK_CHANGED.chatColor()),
-                "Resource pack changed",
-                "The term's pack was set. Declining is allowed."));
+                "The realm dons new raiment",
+                "The monarch has dressed the server in this term's colours. Any subject may "
+                        + "freely decline the pack — no harm shall befall those who do."));
     }
 
     public static void clearForAll(MinecraftServer server, CrownState state) {
@@ -140,8 +141,8 @@ public final class PackManager {
                 AnnounceType.PACK_CHANGED,
                 Component.literal("The term resource pack was cleared.")
                         .withStyle(AnnounceType.PACK_CHANGED.chatColor()),
-                "Resource pack cleared",
-                "Back to the default pack."));
+                "The realm's raiment is retired",
+                "The server returns to its accustomed dress."));
     }
 
     public static void queueJoinPush(MinecraftServer server, ServerPlayer player) {

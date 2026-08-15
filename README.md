@@ -219,11 +219,20 @@ kicks anyone who declines the term's pack, which trades a player's ability to jo
 
 `gated_dimension` is restart-only. Everything else is picked up on config reload.
 
+### Name display
+
+Crown renders the crown's regalia natively, with no permissions or chat mod involved: the sitting
+monarch's name carries a gold, bold `[Monarch]` prefix, and a titled player wears their most
+recently granted title as a bracketed suffix (`Name [Dragonslayer]`) — in chat, the tab list,
+death messages, and anywhere else the display name shows. Both update live at coronation,
+deposition and title grant; no relog needed.
+
 ### LuckPerms (optional)
 
 If LuckPerms is installed, Crown grants the configured group to the monarch as a **temporary node**
 expiring an hour after the term ends, so a crash or a missed transition can never leave a stale
-monarch permanently elevated. Prefix and suffix display stay owned by LuckPerms config, not Crown.
+monarch permanently elevated. This is purely for permissions other mods might key off the group —
+name display is handled natively by Crown, above.
 
 Without LuckPerms, Crown falls back to checking the term record directly and skips group
 assignment. Every authorization decision goes through one facade (`CrownPermissions`), so the

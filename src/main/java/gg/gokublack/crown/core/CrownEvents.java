@@ -3,11 +3,13 @@ package gg.gokublack.crown.core;
 import gg.gokublack.crown.Crown;
 import gg.gokublack.crown.powers.CrownCommands;
 import gg.gokublack.crown.pack.PackManager;
+import gg.gokublack.crown.prestige.LedgerEntry;
 import gg.gokublack.crown.term.Term;
 import gg.gokublack.crown.term.TermPhase;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -22,10 +24,27 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 /** Wiring between NeoForge's event bus and Crown's managers. */
 public final class CrownEvents {
+
+    /**
+     * How long after login (or coronation) the briefing is delivered. Giving items during the
+     * login tick races the client's join screen — the same race the pack push waits out — and at
+     * coronation an immediate briefing title would stomp the "Long live" announcement title.
+     */
+    private static final long BRIEFING_DELAY_TICKS = 60;
+
+    /** Briefings waiting out {@link #BRIEFING_DELAY_TICKS}, mirroring PackManager's join queue. */
+    private static final ConcurrentLinkedQueue<PendingBriefing> PENDING_BRIEFINGS =
+            new ConcurrentLinkedQueue<>();
+
+    private record PendingBriefing(UUID player, long dueAtTick) {
+    }
 
     private CrownEvents() {
     }
@@ -68,8 +87,7 @@ public final class CrownEvents {
         if (state.isMonarch(player.getUUID())) {
             state.setMonarchLastSeen(CrownTime.now());
             if (!state.monarchBriefed()) {
-                state.setMonarchBriefed(true);
-                briefMonarch(player, state);
+                queueBriefing(server, player.getUUID());
             }
         }
 
@@ -108,10 +126,53 @@ public final class CrownEvents {
     }
 
     /**
-     * A winner installed while offline gets their briefing the moment they log in (spec 4.4):
-     * a screen title, and a book listing what the crown actually lets them do.
+     * Queues the monarch's briefing for delivery a few seconds from now. Called at coronation
+     * for an online winner, and at login for one installed while offline (spec 4.4). Idempotent:
+     * a player already in the queue is not queued twice.
+     */
+    public static void queueBriefing(MinecraftServer server, UUID player) {
+        for (PendingBriefing pending : PENDING_BRIEFINGS) {
+            if (pending.player().equals(player)) {
+                return;
+            }
+        }
+        PENDING_BRIEFINGS.add(new PendingBriefing(player, server.getTickCount() + BRIEFING_DELAY_TICKS));
+    }
+
+    /** Drains due briefings. Called once per tick by the scheduler. */
+    public static void processBriefingQueue(MinecraftServer server, CrownState state) {
+        if (PENDING_BRIEFINGS.isEmpty()) {
+            return;
+        }
+        long tick = server.getTickCount();
+        List<PendingBriefing> ready = new ArrayList<>();
+        for (PendingBriefing pending : PENDING_BRIEFINGS) {
+            if (tick >= pending.dueAtTick()) {
+                ready.add(pending);
+            }
+        }
+        for (PendingBriefing pending : ready) {
+            PENDING_BRIEFINGS.remove(pending);
+            // The throne may have changed hands, or another queue entry may have delivered
+            // already. A player who logged out is simply dropped: the flag is still false, so
+            // the login path queues them again next time.
+            if (!state.isMonarch(pending.player()) || state.monarchBriefed()) {
+                continue;
+            }
+            ServerPlayer player = server.getPlayerList().getPlayer(pending.player());
+            if (player != null) {
+                briefMonarch(player, state);
+            }
+        }
+    }
+
+    /**
+     * The briefing itself (spec 4.4): a screen title, and a book listing what the crown actually
+     * lets them do. {@code monarchBriefed} is set here, at actual delivery — never earlier — so
+     * a briefing that fails to arrive is retried on the next login rather than lost.
      */
     private static void briefMonarch(ServerPlayer player, CrownState state) {
+        state.setMonarchBriefed(true);
         player.connection.send(new ClientboundSetTitleTextPacket(
                 Component.literal("You are the monarch").withStyle(ChatFormatting.GOLD)));
 
@@ -158,9 +219,11 @@ public final class CrownEvents {
                                     /crown resign
                                     Step down."""))),
                     true));
-            if (!player.getInventory().add(book)) {
-                player.drop(book, false);
-            }
+            giveBook(player, book);
+            // The briefed flag lives in the world's SavedData; the book lives in playerdata.
+            // Saving players now closes the window where a crash rolls back one file but not
+            // the other — which would mean a monarch marked briefed holding no book.
+            player.server.getPlayerList().saveAll();
         } catch (Exception e) {
             // The book is a nicety; the powers work either way.
             Crown.LOGGER.warn("Could not hand the monarch their briefing book", e);
@@ -168,6 +231,81 @@ public final class CrownEvents {
                             "You are the monarch. Run /crown for what the crown lets you do.")
                     .withStyle(ChatFormatting.GOLD));
         }
+    }
+
+    /**
+     * Hands over the briefing book without ever overwriting an occupied slot: it goes into the
+     * first empty inventory slot, or onto the ground in front of the player when there is none.
+     * Either way the monarch is told where it went.
+     */
+    private static void giveBook(ServerPlayer player, ItemStack book) {
+        int slot = player.getInventory().getFreeSlot();
+        if (slot >= 0) {
+            player.getInventory().setItem(slot, book);
+            player.sendSystemMessage(Component.literal(
+                            "Your briefing, \"The Crown\", has been added to your inventory.")
+                    .withStyle(ChatFormatting.GOLD));
+        } else {
+            player.drop(book, false);
+            player.sendSystemMessage(Component.literal(
+                            "Your inventory is full — your briefing, \"The Crown\", is on the "
+                                    + "ground in front of you.")
+                    .withStyle(ChatFormatting.GOLD));
+        }
+    }
+
+    // ------------------------------------------------------------------ name display
+
+    /**
+     * The sitting monarch wears a gold, bold {@code [Monarch]} prefix, and anyone Crown has
+     * titled wears their latest title as a bracketed suffix — rendered natively through the
+     * display name, so it shows in chat and the tab list with no permissions mod and no
+     * chat-formatter mod involved.
+     */
+    @SubscribeEvent
+    public static void onNameFormat(PlayerEvent.NameFormat event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            event.setDisplayname(decorateName(player, event.getDisplayname()));
+        }
+    }
+
+    @SubscribeEvent
+    public static void onTabListNameFormat(PlayerEvent.TabListNameFormat event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            Component base = event.getDisplayName();
+            event.setDisplayName(decorateName(player, base == null ? player.getName() : base));
+        }
+    }
+
+    private static Component decorateName(ServerPlayer player, Component name) {
+        CrownState state = CrownState.get(player.server);
+        boolean monarch = state.isMonarch(player.getUUID());
+        String title = latestTitle(state, player.getUUID());
+        if (!monarch && title == null) {
+            return name;
+        }
+        // An empty parent, so each piece keeps its own style instead of inheriting the prefix's.
+        MutableComponent out = Component.empty();
+        if (monarch) {
+            out.append(Component.literal("[Monarch] ")
+                    .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
+        }
+        out.append(name);
+        if (title != null) {
+            out.append(Component.literal(" [" + title + "]").withStyle(ChatFormatting.YELLOW));
+        }
+        return out;
+    }
+
+    /** The most recently granted title, or {@code null}. The ledger is append-only, so last wins. */
+    private static String latestTitle(CrownState state, UUID player) {
+        String title = null;
+        for (LedgerEntry entry : state.ledger()) {
+            if (entry instanceof LedgerEntry.TitleGranted granted && granted.recipient().equals(player)) {
+                title = granted.title();
+            }
+        }
+        return title;
     }
 
     @SubscribeEvent

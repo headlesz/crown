@@ -65,7 +65,7 @@ public final class CrownState extends SavedData {
     private long lastTransitionId;
     private long monarchLastSeen;
     private boolean monarchAfkWarned;
-    /** False until the sitting monarch has been handed their briefing (spec 4.4, offline winner). */
+    /** False until the sitting monarch has actually been handed their briefing (spec 4.4). */
     private boolean monarchBriefed;
 
     public CrownState() {
