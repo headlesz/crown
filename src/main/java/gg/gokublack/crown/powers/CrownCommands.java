@@ -35,6 +35,7 @@ import net.minecraft.server.level.ServerPlayer;
 
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -98,13 +99,23 @@ public final class CrownCommands {
                                         .then(Commands.argument("title-text", StringArgumentType.greedyString())
                                                 .executes(CrownCommands::grantTitle)))))
 
+                // A commission is an open bounty: it names no builder, and anyone may complete
+                // it. Brigadier prefers literals, so "complete" wins over the text argument —
+                // the one casualty is a commission whose brief begins with the word "complete".
                 .then(Commands.literal("commission")
                         .then(Commands.literal("complete")
+                                .then(Commands.literal("everyone")
+                                        .executes(ctx -> completeCommission(ctx, true, -1))
+                                        .then(Commands.argument("number", IntegerArgumentType.integer(1))
+                                                .executes(ctx -> completeCommission(ctx, true,
+                                                        IntegerArgumentType.getInteger(ctx, "number")))))
                                 .then(Commands.argument("player", GameProfileArgument.gameProfile())
-                                        .executes(CrownCommands::completeCommission)))
-                        .then(Commands.argument("player", GameProfileArgument.gameProfile())
-                                .then(Commands.argument("text", StringArgumentType.greedyString())
-                                        .executes(CrownCommands::issueCommission))))
+                                        .executes(ctx -> completeCommission(ctx, false, -1))
+                                        .then(Commands.argument("number", IntegerArgumentType.integer(1))
+                                                .executes(ctx -> completeCommission(ctx, false,
+                                                        IntegerArgumentType.getInteger(ctx, "number"))))))
+                        .then(Commands.argument("text", StringArgumentType.greedyString())
+                                .executes(CrownCommands::issueCommission)))
 
                 .then(Commands.literal("endraid")
                         .then(Commands.literal("request")
@@ -321,47 +332,86 @@ public final class CrownCommands {
 
     private static int issueCommission(CommandContext<CommandSourceStack> ctx) {
         return withPowers(ctx, (state, term, player) -> {
-            GameProfile target = singleProfile(ctx);
-            if (target == null) {
+            String text = StringArgumentType.getString(ctx, "text");
+            int max = CrownConfig.MAX_OPEN_COMMISSIONS.get();
+            if (state.openCommissions().size() >= max) {
+                fail(ctx, "There are already " + max + " commissions standing. "
+                        + "See one delivered before you call for more.");
                 return 0;
             }
-            String text = StringArgumentType.getString(ctx, "text");
-            state.openCommissions().put(target.getId(), text);
-            state.appendLedger(new LedgerEntry.CommissionIssued(
-                    target.getId(), target.getName(), text, term.index(), CrownTime.now()));
+            state.openCommissions().add(text);
+            state.setDirty();
+            state.appendLedger(new LedgerEntry.CommissionIssued(text, term.index(), CrownTime.now()));
 
             Announcer.emit(ctx.getSource().getServer(), AnnounceEvent.of(
                     AnnounceType.COMMISSION_ISSUED,
                     Component.literal("COMMISSION: ").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD)
-                            .append(Component.literal(target.getName() + " — " + text)
-                                    .withStyle(ChatFormatting.WHITE)),
-                    "A royal commission",
-                    target.getName() + " is charged by the crown of " + term.monarchName()
-                            + ": " + text + "\nLet the work begin."));
+                            .append(Component.literal(text).withStyle(ChatFormatting.WHITE))
+                            .append(Component.literal(" — open to anyone.")
+                                    .withStyle(ChatFormatting.GRAY)),
+                    "The crown calls for a build",
+                    "By the word of " + term.monarchName() + ": " + text
+                            + "\nOpen to anyone. Whoever delivers it will be named."));
             return 1;
         });
     }
 
-    private static int completeCommission(CommandContext<CommandSourceStack> ctx) {
+    /**
+     * Completes an open commission and credits the delivery: to one named player, or to the
+     * whole group ({@code everyone}). {@code number} is the commission's 1-based position from
+     * {@code /crown}; {@code -1} means "the only one open" and fails when that is ambiguous.
+     */
+    private static int completeCommission(CommandContext<CommandSourceStack> ctx,
+                                          boolean everyone,
+                                          int number) {
         return withPowers(ctx, (state, term, player) -> {
-            GameProfile target = singleProfile(ctx);
-            if (target == null) {
+            GameProfile target = null;
+            if (!everyone) {
+                target = singleProfile(ctx);
+                if (target == null) {
+                    return 0;
+                }
+            }
+            List<String> open = state.openCommissions();
+            if (open.isEmpty()) {
+                fail(ctx, "No commission is standing this term.");
                 return 0;
             }
-            String text = state.openCommissions().remove(target.getId());
-            if (text == null) {
-                fail(ctx, target.getName() + " has no open commission this term.");
+            int index;
+            if (number > 0) {
+                if (number > open.size()) {
+                    fail(ctx, "There " + (open.size() == 1
+                            ? "is only 1 commission"
+                            : "are only " + open.size() + " commissions")
+                            + " standing — /crown lists them.");
+                    return 0;
+                }
+                index = number - 1;
+            } else if (open.size() == 1) {
+                index = 0;
+            } else {
+                fail(ctx, open.size() + " commissions are standing — say which one: "
+                        + "/crown commission complete <who> <number>. /crown lists them.");
                 return 0;
             }
+
+            String text = open.remove(index);
+            state.setDirty();
+            String byName = everyone ? "everyone" : target.getName();
             state.appendLedger(new LedgerEntry.CommissionCompleted(
-                    target.getId(), target.getName(), text, term.index(), CrownTime.now()));
+                    everyone ? null : target.getId(), byName, text, term.index(), CrownTime.now()));
+
             Announcer.emit(ctx.getSource().getServer(), AnnounceEvent.of(
                     AnnounceType.COMMISSION_COMPLETED,
-                    Component.literal("Commission complete — " + target.getName() + " built: " + text)
+                    Component.literal("Commission complete — "
+                                    + (everyone ? "delivered by everyone: " : byName + " delivered: ")
+                                    + text)
                             .withStyle(ChatFormatting.GOLD),
                     "A commission is delivered",
-                    target.getName() + " has delivered what the crown asked: " + text
-                            + "\nLet it stand for all to see."));
+                    (everyone
+                            ? "Delivered by the whole realm: "
+                            : byName + " has delivered what the crown asked: ")
+                            + text + "\nLet it stand for all to see."));
             return 1;
         });
     }
@@ -532,6 +582,7 @@ public final class CrownCommands {
             line(source, "ends", CrownTime.format(term.endsAt()) + " (" + CrownTime.remaining(term.endsAt()) + ")");
             line(source, "powers", term.powersFrozen() ? "FROZEN (election open)" : "active");
             line(source, "decrees", String.valueOf(term.decrees().size()));
+            line(source, "open commissions", String.valueOf(state.openCommissions().size()));
             line(source, "events", String.valueOf(term.events().size()));
             line(source, "titles granted", term.titlesGranted() + "/" + CrownConfig.TITLES_PER_TERM.get());
         }
@@ -588,6 +639,12 @@ public final class CrownCommands {
             for (String decree : term.decrees()) {
                 source.sendSuccess(() -> Component.literal("  decree: " + decree)
                         .withStyle(ChatFormatting.LIGHT_PURPLE), false);
+            }
+            List<String> open = state.openCommissions();
+            for (int i = 0; i < open.size(); i++) {
+                final String line = "  commission " + (i + 1) + ": " + open.get(i);
+                source.sendSuccess(() -> Component.literal(line)
+                        .withStyle(ChatFormatting.GOLD), false);
             }
         }
         if (state.phase() == TermPhase.ELECTION && state.election() != null) {

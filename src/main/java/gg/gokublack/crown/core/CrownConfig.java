@@ -23,6 +23,7 @@ public final class CrownConfig {
 
     // [powers]
     public static final ModConfigSpec.IntValue MAX_ACTIVE_DECREES;
+    public static final ModConfigSpec.IntValue MAX_OPEN_COMMISSIONS;
     public static final ModConfigSpec.IntValue TITLES_PER_TERM;
     public static final ModConfigSpec.IntValue EVENT_COUNTDOWN_MINUTES;
 
@@ -77,6 +78,10 @@ public final class CrownConfig {
 
         b.push("powers");
         MAX_ACTIVE_DECREES = b.defineInRange("max_active_decrees", 3, 0, 32);
+        MAX_OPEN_COMMISSIONS = b
+                .comment("Commissions are open bounties anyone may complete; this caps how many "
+                        + "stand at once.")
+                .defineInRange("max_open_commissions", 3, 0, 32);
         TITLES_PER_TERM = b
                 .comment("Scarcity is what keeps titles meaningful.")
                 .defineInRange("titles_per_term", 3, 0, 32);

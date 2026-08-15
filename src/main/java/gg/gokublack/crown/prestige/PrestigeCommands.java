@@ -88,8 +88,10 @@ public final class PrestigeCommands {
         return switch (entry) {
             case LedgerEntry.ReignServed r -> r.monarch().equals(player);
             case LedgerEntry.TitleGranted t -> t.recipient().equals(player);
-            case LedgerEntry.CommissionIssued c -> c.builder().equals(player);
-            case LedgerEntry.CommissionCompleted c -> c.builder().equals(player);
+            // An issued commission is open to anyone, so it is nobody's personal record; a
+            // completion credited to "everyone" likewise lives in /halloffame, not /laurels.
+            case LedgerEntry.CommissionIssued c -> false;
+            case LedgerEntry.CommissionCompleted c -> player.equals(c.by());
             case LedgerEntry.AdminNote a -> false;
         };
     }
@@ -99,8 +101,9 @@ public final class PrestigeCommands {
             case LedgerEntry.ReignServed r -> "reigned — term " + r.termIndex();
             case LedgerEntry.TitleGranted t -> "\"" + t.title() + "\" — granted by " + t.grantedByName()
                     + " (term " + t.termIndex() + ")";
-            case LedgerEntry.CommissionIssued c -> "commissioned: " + c.text() + " (term " + c.termIndex() + ")";
-            case LedgerEntry.CommissionCompleted c -> "completed: " + c.text() + " (term " + c.termIndex() + ")";
+            case LedgerEntry.CommissionIssued c -> "the crown called for: " + c.text()
+                    + " (term " + c.termIndex() + ")";
+            case LedgerEntry.CommissionCompleted c -> "delivered: " + c.text() + " (term " + c.termIndex() + ")";
             case LedgerEntry.AdminNote a -> "note: " + a.text();
         };
     }

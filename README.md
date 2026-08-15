@@ -156,8 +156,9 @@ All of these expire at term end, and all freeze while the succession vote is ope
 | `/crown event create <name> <when> [description]` | Schedule a community event, with a countdown boss bar |
 | `/crown event cancel <name>` | Call it off |
 | `/crown title grant <player> <title>` | Grant a cosmetic title (max 3 per term) |
-| `/crown commission <player> <text>` | Publicly commission a build |
-| `/crown commission complete <player>` | Mark it delivered, with fanfare |
+| `/crown commission <text>` | Publicly commission a build — an open bounty anyone may complete (max 3 standing) |
+| `/crown commission complete <player> [number]` | Mark it delivered by that player, with fanfare |
+| `/crown commission complete everyone [number]` | Mark it delivered by the whole group |
 | `/crown pack set <url> <sha1>` | Set the term's resource pack |
 | `/crown pack clear` | Revert to the default |
 | `/crown endraid request <start-time> <hours>` | Propose the season finale |
@@ -197,6 +198,7 @@ allow_self_vote = false
 
 [powers]
 max_active_decrees = 3
+max_open_commissions = 3
 titles_per_term = 3
 
 [endgate]

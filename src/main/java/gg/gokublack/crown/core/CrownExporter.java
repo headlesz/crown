@@ -139,8 +139,8 @@ public final class CrownExporter {
             case LedgerEntry.ReignServed r -> r.monarchName() + " reigned in term " + r.termIndex();
             case LedgerEntry.TitleGranted t -> t.recipientName() + " named \"" + t.title()
                     + "\" by " + t.grantedByName();
-            case LedgerEntry.CommissionIssued c -> c.builderName() + " commissioned: " + c.text();
-            case LedgerEntry.CommissionCompleted c -> c.builderName() + " completed: " + c.text();
+            case LedgerEntry.CommissionIssued c -> "the crown commissioned: " + c.text();
+            case LedgerEntry.CommissionCompleted c -> c.byName() + " delivered: " + c.text();
             case LedgerEntry.AdminNote a -> "note by " + a.authorName() + ": " + a.text();
         };
     }

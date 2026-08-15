@@ -2,6 +2,7 @@ package gg.gokublack.crown.prestige;
 
 import net.minecraft.nbt.CompoundTag;
 
+import javax.annotation.Nullable;
 import java.util.UUID;
 
 /**
@@ -53,8 +54,8 @@ public sealed interface LedgerEntry {
         }
     }
 
-    record CommissionIssued(UUID builder, String builderName, String text, int termIndex, long at)
-            implements LedgerEntry {
+    /** A bounty declared by the crown. It names no builder: anyone may complete it. */
+    record CommissionIssued(String text, int termIndex, long at) implements LedgerEntry {
         @Override
         public String type() {
             return "commission_issued";
@@ -62,13 +63,16 @@ public sealed interface LedgerEntry {
 
         @Override
         public void write(CompoundTag tag) {
-            tag.putUUID("builder", builder);
-            tag.putString("builderName", builderName);
             tag.putString("text", text);
         }
     }
 
-    record CommissionCompleted(UUID builder, String builderName, String text, int termIndex, long at)
+    /**
+     * A commission delivered — by one named player, or by the whole group ({@code by == null},
+     * {@code byName == "everyone"}). The NBT keys stay {@code builder}/{@code builderName} so
+     * entries written before commissions became open-to-all load unchanged.
+     */
+    record CommissionCompleted(@Nullable UUID by, String byName, String text, int termIndex, long at)
             implements LedgerEntry {
         @Override
         public String type() {
@@ -77,8 +81,10 @@ public sealed interface LedgerEntry {
 
         @Override
         public void write(CompoundTag tag) {
-            tag.putUUID("builder", builder);
-            tag.putString("builderName", builderName);
+            if (by != null) {
+                tag.putUUID("builder", by);
+            }
+            tag.putString("builderName", byName);
             tag.putString("text", text);
         }
     }
@@ -117,12 +123,11 @@ public sealed interface LedgerEntry {
             case "title_granted" -> new TitleGranted(
                     tag.getUUID("recipient"), tag.getString("recipientName"), tag.getString("title"),
                     tag.getUUID("grantedBy"), tag.getString("grantedByName"), termIndex, at);
-            case "commission_issued" -> new CommissionIssued(
-                    tag.getUUID("builder"), tag.getString("builderName"), tag.getString("text"),
-                    termIndex, at);
+            // Pre-open-commission entries carry builder fields on "issued"; they are ignored.
+            case "commission_issued" -> new CommissionIssued(tag.getString("text"), termIndex, at);
             case "commission_completed" -> new CommissionCompleted(
-                    tag.getUUID("builder"), tag.getString("builderName"), tag.getString("text"),
-                    termIndex, at);
+                    tag.hasUUID("builder") ? tag.getUUID("builder") : null,
+                    tag.getString("builderName"), tag.getString("text"), termIndex, at);
             default -> new AdminNote(
                     tag.getString("text"), tag.getUUID("author"), tag.getString("authorName"),
                     termIndex, at);

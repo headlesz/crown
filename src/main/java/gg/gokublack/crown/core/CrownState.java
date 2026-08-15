@@ -10,6 +10,7 @@ import gg.gokublack.crown.term.TermPhase;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.saveddata.SavedData;
@@ -17,7 +18,6 @@ import net.minecraft.world.level.saveddata.SavedData;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -35,7 +35,7 @@ import java.util.UUID;
  */
 public final class CrownState extends SavedData {
     public static final String FILE_ID = "crown_state";
-    public static final int CURRENT_DATA_VERSION = 1;
+    public static final int CURRENT_DATA_VERSION = 2;
 
     private int dataVersion = CURRENT_DATA_VERSION;
     private TermPhase phase = TermPhase.INTERREGNUM;
@@ -55,8 +55,12 @@ public final class CrownState extends SavedData {
 
     /** Everyone who logged in during the current term: the electorate (spec 5.1). */
     private final Set<UUID> activeThisTerm = new LinkedHashSet<>();
-    /** Open commissions in the current term, builder to brief. */
-    private final Map<UUID, String> openCommissions = new LinkedHashMap<>();
+    /**
+     * Open commissions in the current term, in the order they were issued. A commission is a
+     * bounty: it names no builder, and anyone may complete it. Players address them by their
+     * 1-based position, as shown by {@code /crown}.
+     */
+    private final List<String> openCommissions = new ArrayList<>();
 
     /**
      * Monotonically increasing. Guards against a backwards clock jump re-firing a transition
@@ -173,7 +177,7 @@ public final class CrownState extends SavedData {
         }
     }
 
-    public Map<UUID, String> openCommissions() {
+    public List<String> openCommissions() {
         return openCommissions;
     }
 
@@ -274,13 +278,10 @@ public final class CrownState extends SavedData {
         NbtHelper.putUuidSet(tag, "activeThisTerm", activeThisTerm);
 
         ListTag commissions = new ListTag();
-        openCommissions.forEach((builder, text) -> {
-            CompoundTag c = new CompoundTag();
-            c.putUUID("builder", builder);
-            c.putString("text", text);
-            commissions.add(c);
-        });
-        tag.put("openCommissions", commissions);
+        for (String text : openCommissions) {
+            commissions.add(StringTag.valueOf(text));
+        }
+        tag.put("openCommissionList", commissions);
         return tag;
     }
 
@@ -347,10 +348,9 @@ public final class CrownState extends SavedData {
 
         s.activeThisTerm.addAll(NbtHelper.getUuidSet(tag, "activeThisTerm"));
 
-        ListTag commissions = tag.getList("openCommissions", Tag.TAG_COMPOUND);
+        ListTag commissions = tag.getList("openCommissionList", Tag.TAG_STRING);
         for (int i = 0; i < commissions.size(); i++) {
-            CompoundTag c = commissions.getCompound(i);
-            s.openCommissions.put(c.getUUID("builder"), c.getString("text"));
+            s.openCommissions.add(commissions.getString(i));
         }
         s.dataVersion = CURRENT_DATA_VERSION;
     }
@@ -369,11 +369,25 @@ public final class CrownState extends SavedData {
         int version = fromVersion;
         while (version < CURRENT_DATA_VERSION) {
             switch (version) {
-                // case 1 -> migrate1to2(tag);
+                case 1 -> migrate1to2(tag);
                 default -> {
                 }
             }
             version++;
         }
+    }
+
+    /**
+     * v1 stored open commissions as builder-keyed compounds; v2 commissions are open to anyone,
+     * so only the briefs survive.
+     */
+    private static void migrate1to2(CompoundTag tag) {
+        ListTag old = tag.getList("openCommissions", Tag.TAG_COMPOUND);
+        ListTag texts = new ListTag();
+        for (int i = 0; i < old.size(); i++) {
+            texts.add(StringTag.valueOf(old.getCompound(i).getString("text")));
+        }
+        tag.put("openCommissionList", texts);
+        tag.remove("openCommissions");
     }
 }
